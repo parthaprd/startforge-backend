@@ -3,15 +3,17 @@ const logger = require('../utils/logger');
 const buildAllowedOrigins = () => {
   const origins = new Set();
 
+  const normalizeOrigin = (url) => url.replace(/\/+$/, '');
+
   if (process.env.CLIENT_URL) {
-    origins.add(process.env.CLIENT_URL);
+    origins.add(normalizeOrigin(process.env.CLIENT_URL));
   }
 
   if (process.env.ALLOWED_ORIGINS) {
     process.env.ALLOWED_ORIGINS.split(',')
       .map((o) => o.trim())
       .filter(Boolean)
-      .forEach((o) => origins.add(o));
+      .forEach((o) => origins.add(normalizeOrigin(o)));
   }
 
   if (process.env.NODE_ENV !== 'production') {
@@ -43,7 +45,8 @@ const corsOptions = {
       return callback(null, true);
     }
 
-    if (allowedOrigins.includes(origin)) {
+    const normalized = origin.replace(/\/+$/, '');
+    if (allowedOrigins.includes(normalized)) {
       return callback(null, true);
     }
 
