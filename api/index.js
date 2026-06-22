@@ -14,8 +14,6 @@ require('dotenv').config();
 const mongoose = require('mongoose');
 const createApp = require('../src/app');
 
-const VERCEL = !!process.env.VERCEL;
-
 let cachedDb = null;
 
 const connectDB = async () => {
@@ -27,13 +25,14 @@ const connectDB = async () => {
   }
 
   // Reuse cached connection in warm invocations.
-  if (cachedDb && mongoose.connection.readyState === 1) {
+  if (mongoose.connection.readyState === 1) {
     return cachedDb;
   }
 
   const conn = await mongoose.connect(uri, {
     dbName: dbName || 'startupforge',
-    serverSelectionTimeoutMS: 10000,
+    serverSelectionTimeoutMS: 5000, // fail fast in serverless
+    serverApi: { version: '1', strictMode: false, deprecationErrors: false },
     maxPoolSize: 5, // smaller pool for serverless
   });
 
@@ -47,19 +46,40 @@ const connectDB = async () => {
  * so that subsequent warm invocations skip both DB connect and app creation.
  */
 let cachedApp = null;
+let dbConnecting = null;
 
 const getApp = async () => {
   if (cachedApp) {
     return cachedApp;
   }
 
-  await connectDB();
-  cachedApp = createApp();
-  return cachedApp;
+  // Prevent multiple simultaneous connection attempts.
+  if (!dbConnecting) {
+    dbConnecting = connectDB().then(() => {
+      cachedApp = createApp();
+      return cachedApp;
+    }).catch((err) => {
+      dbConnecting = null; // allow retry on next request
+      throw err;
+    });
+  }
+
+  return dbConnecting;
 };
 
 // ---- Vercel serverless handler ----
 module.exports = async (req, res) => {
-  const app = await getApp();
-  return app(req, res);
+  try {
+    const app = await getApp();
+    return app(req, res);
+  } catch (err) {
+    console.error('Serverless startup error:', err.message);
+    if (!res.headersSent) {
+      res.status(503).json({
+        success: false,
+        message: 'Database connection failed.',
+        error: process.env.NODE_ENV === 'production' ? undefined : err.message,
+      });
+    }
+  }
 };
