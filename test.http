@@ -1,0 +1,362 @@
+### =========================================================
+### StartupForge API - HTTP test examples (VS Code REST Client)
+### Install the "REST Client" extension, then "Send Request" on each.
+### =========================================================
+
+@baseUrl = http://localhost:5000
+@cookieJar =Cookie: token={{loginToken}}
+
+### -----------------------------------------------------
+### Health
+### -----------------------------------------------------
+GET {{baseUrl}}/api/health
+
+
+### =====================================================
+### AUTHENTICATION
+### =====================================================
+
+### Register a founder (credential)
+# @name registerFounder
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "name": "Jane Founder",
+  "email": "founder@example.com",
+  "password": "Secret123",
+  "role": "founder"
+}
+
+### Register a collaborator (credential)
+# @name registerCollaborator
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "name": "Joe Collaborator",
+  "email": "collab@example.com",
+  "password": "Secret123",
+  "role": "collaborator"
+}
+
+### Register via Google OAuth (simulated)
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "name": "Greta Google",
+  "email": "greta@gmail.com",
+  "googleId": "google-12345",
+  "role": "collaborator"
+}
+
+### Login (credential) - capture cookie/token
+# @name login
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "founder@example.com",
+  "password": "Secret123"
+}
+
+### Save the token from the login response:
+@loginToken = {{login.response.body.data.token}}
+
+### Get current user (protected)
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{loginToken}}
+
+### Update profile (protected)
+PUT {{baseUrl}}/api/auth/update-profile
+Authorization: Bearer {{loginToken}}
+Content-Type: application/json
+
+{
+  "bio": "Building the future of work.",
+  "skills": ["React", "Node.js", "Product"],
+  "portfolio": "https://janedev.com"
+}
+
+### Logout
+POST {{baseUrl}}/api/auth/logout
+Authorization: Bearer {{loginToken}}
+
+
+### =====================================================
+### VALIDATION / ERROR SCENARIOS
+### =====================================================
+
+### Weak password (should return 400 with errors[])
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "name": "Bad",
+  "email": "bad@example.com",
+  "password": "short"
+}
+
+### Duplicate email (should return 409)
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "name": "Jane Founder",
+  "email": "founder@example.com",
+  "password": "Secret123"
+}
+
+### Missing auth (should return 401)
+GET {{baseUrl}}/api/auth/me
+
+### Wrong role (collaborator trying founder action -> 403)
+POST {{baseUrl}}/api/startups
+Authorization: Bearer {{loginToken}}
+Content-Type: application/json
+
+{
+  "startup_name": "Test",
+  "logo": "https://example.com/logo.png",
+  "description": "Should fail because token is for a founder here; swap token to test."
+}
+
+
+### =====================================================
+### IMAGE UPLOAD (ImgBB)
+### =====================================================
+
+### Upload an image (multipart/form-data, field "image")
+POST {{baseUrl}}/api/upload/image
+Authorization: Bearer {{loginToken}}
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary
+
+------WebKitFormBoundary
+Content-Disposition: form-data; name="image"; filename="logo.png"
+Content-Type: image/png
+
+< ./logo.png
+------WebKitFormBoundary--
+
+
+### =====================================================
+### STARTUPS (Founder)
+### =====================================================
+
+### Create startup (founder)
+# @name createStartup
+POST {{baseUrl}}/api/startups
+Authorization: Bearer {{loginToken}}
+Content-Type: application/json
+
+{
+  "startup_name": "Acme Robotics",
+  "logo": "https://i.ibb.co/placeholder/acme.png",
+  "industry": "Technology",
+  "description": "We build warehouse robots that work alongside humans.",
+  "funding_stage": "Seed",
+  "website": "https://acmerobotics.example.com"
+}
+
+@startupId = {{createStartup.response.body.data._id}}
+
+### Get my startup
+GET {{baseUrl}}/api/startups/my-startup
+Authorization: Bearer {{loginToken}}
+
+### Update my startup
+PUT {{baseUrl}}/api/startups/{{startupId}}
+Authorization: Bearer {{loginToken}}
+Content-Type: application/json
+
+{
+  "description": "Updated description for Acme Robotics.",
+  "funding_stage": "Series A"
+}
+
+### List approved startups (public, paginated)
+GET {{baseUrl}}/api/startups?page=1&limit=10&industry=Technology&search=acme
+
+### Get single startup (public)
+GET {{baseUrl}}/api/startups/{{startupId}}
+
+### Delete startup (founder)
+DELETE {{baseUrl}}/api/startups/{{startupId}}
+Authorization: Bearer {{loginToken}}
+
+
+### =====================================================
+### OPPORTUNITIES (Founder)
+### =====================================================
+
+### Create opportunity (founder; requires approved startup)
+# @name createOpportunity
+POST {{baseUrl}}/api/opportunities
+Authorization: Bearer {{loginToken}}
+Content-Type: application/json
+
+{
+  "role_title": "Senior Backend Engineer",
+  "required_skills": ["Node.js", "MongoDB", "AWS"],
+  "work_type": "Remote",
+  "commitment_level": "Full-time",
+  "deadline": "2026-12-31",
+  "description": "Own our core API and scale it.",
+  "responsibilities": ["Design APIs", "Own uptime", "Mentor juniors"]
+}
+
+@opportunityId = {{createOpportunity.response.body.data._id}}
+
+### Search/filter opportunities (public)
+GET {{baseUrl}}/api/opportunities?search=backend&work_type=Remote&commitment_level=Full-time&page=1&limit=10
+
+### Filter by skills
+GET {{baseUrl}}/api/opportunities?skills=Node.js,AWS
+
+### Filter by industry
+GET {{baseUrl}}/api/opportunities?industry=Technology,Finance
+
+### Get single opportunity
+GET {{baseUrl}}/api/opportunities/{{opportunityId}}
+
+### List my opportunities
+GET {{baseUrl}}/api/opportunities/my-opportunities
+Authorization: Bearer {{loginToken}}
+
+### Update opportunity
+PUT {{baseUrl}}/api/opportunities/{{opportunityId}}
+Authorization: Bearer {{loginToken}}
+Content-Type: application/json
+
+{
+  "description": "Updated role description."
+}
+
+### Delete opportunity
+DELETE {{baseUrl}}/api/opportunities/{{opportunityId}}
+Authorization: Bearer {{loginToken}}
+
+
+### =====================================================
+### APPLICATIONS
+### =====================================================
+
+### Collaborator applies
+# @name apply
+POST {{baseUrl}}/api/applications
+Authorization: Bearer {{collabToken}}
+Content-Type: application/json
+
+{
+  "opportunity_id": "{{opportunityId}}",
+  "motivation": "I'd love to join because I've shipped similar systems.",
+  "portfolio_link": "https://myportfolio.example.com"
+}
+
+@applicationId = {{apply.response.body.data._id}}
+
+### Apply twice (should return 409)
+POST {{baseUrl}}/api/applications
+Authorization: Bearer {{collabToken}}
+Content-Type: application/json
+
+{
+  "opportunity_id": "{{opportunityId}}",
+  "motivation": "Second attempt should be rejected."
+}
+
+### List my applications (collaborator)
+GET {{baseUrl}}/api/applications/my-applications
+Authorization: Bearer {{collabToken}}
+
+### Founder lists applications for an opportunity
+GET {{baseUrl}}/api/applications/opportunity/{{opportunityId}}
+Authorization: Bearer {{loginToken}}
+
+### Founder accepts an application
+PUT {{baseUrl}}/api/applications/{{applicationId}}/status
+Authorization: Bearer {{loginToken}}
+Content-Type: application/json
+
+{
+  "status": "accepted"
+}
+
+### Founder rejects an application
+PUT {{baseUrl}}/api/applications/{{applicationId}}/status
+Authorization: Bearer {{loginToken}}
+Content-Type: application/json
+
+{
+  "status": "rejected"
+}
+
+### Collaborator withdraws
+DELETE {{baseUrl}}/api/applications/{{applicationId}}
+Authorization: Bearer {{collabToken}}
+
+
+### =====================================================
+### PAYMENTS (Stripe) - Founder only
+### =====================================================
+
+### Create checkout session
+POST {{baseUrl}}/api/payments/create-checkout-session
+Authorization: Bearer {{loginToken}}
+
+### Verify premium status
+GET {{baseUrl}}/api/payments/verify-premium
+Authorization: Bearer {{loginToken}}
+
+### My transactions
+GET {{baseUrl}}/api/payments/my-transactions
+Authorization: Bearer {{loginToken}}
+
+### Stripe webhook (use Stripe CLI: stripe listen --forward-to localhost:5000/api/payments/webhook)
+POST {{baseUrl}}/api/payments/webhook
+Stripe-Signature: t=xxxx,v1=xxxx
+Content-Type: application/json
+
+{}
+
+
+### =====================================================
+### ADMIN
+### =====================================================
+
+### List users
+GET {{baseUrl}}/api/admin/users?page=1&limit=20&role=founder
+Authorization: Bearer {{adminToken}}
+
+### Block a user
+PUT {{baseUrl}}/api/admin/users/{{userId}}/block
+Authorization: Bearer {{adminToken}}
+
+### Unblock a user
+PUT {{baseUrl}}/api/admin/users/{{userId}}/unblock
+Authorization: Bearer {{adminToken}}
+
+### List all startups (all statuses)
+GET {{baseUrl}}/api/admin/startups?status=pending
+Authorization: Bearer {{adminToken}}
+
+### Approve a startup
+PUT {{baseUrl}}/api/admin/startups/{{startupId}}/approve
+Authorization: Bearer {{adminToken}}
+
+### Reject a startup
+PUT {{baseUrl}}/api/admin/startups/{{startupId}}/reject
+Authorization: Bearer {{adminToken}}
+
+### Delete a startup (admin)
+DELETE {{baseUrl}}/api/admin/startups/{{startupId}}
+Authorization: Bearer {{adminToken}}
+
+### List transactions
+GET {{baseUrl}}/api/admin/transactions?payment_status=succeeded
+Authorization: Bearer {{adminToken}}
+
+### Platform analytics
+GET {{baseUrl}}/api/admin/analytics
+Authorization: Bearer {{adminToken}}
