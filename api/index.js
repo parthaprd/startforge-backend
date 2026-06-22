@@ -73,12 +73,12 @@ module.exports = async (req, res) => {
     const app = await getApp();
     return app(req, res);
   } catch (err) {
-    console.error('Serverless startup error:', err.message);
+    console.error('Serverless DB error:', err.message);
     if (!res.headersSent) {
       res.status(503).json({
         success: false,
         message: 'Database connection failed.',
-        error: process.env.NODE_ENV === 'production' ? undefined : err.message,
+        detail: err.message,
       });
     }
   }
