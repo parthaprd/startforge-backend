@@ -16,6 +16,8 @@ const path = require('path');
 
 const corsOptions = require('./config/cors');
 const routes = require('./routes');
+const authRoutes = require('./routes/auth.routes');
+const { getAuth } = require('./config/auth');
 const logger = require('./utils/logger');
 const { errorHandler, notFound } = require('./middlewares/errorHandler.middleware');
 
@@ -40,6 +42,30 @@ const createApp = () => {
   // ---- CORS. ----
   app.use(cors(corsOptions));
 
+  // ---- Cookies (needed before auth so sessions resolve). ----
+  app.use(cookieParser());
+
+  // ============================================================
+  // Better Auth
+  // ------------------------------------------------------------
+  // The Better Auth handler MUST be mounted before express.json(); the SDK
+  // reads/streams the raw request body itself. Our custom profile endpoints
+  // (/api/auth/me, /api/auth/update-profile) are registered first so they win
+  // over the catch-all, and every other /api/auth/* request is forwarded to
+  // Better Auth (sign-up/email, sign-in/email, sign-out, social, etc.).
+  // ============================================================
+  app.use('/api/auth', authRoutes);
+
+  app.all('/api/auth/*', async (req, res, next) => {
+    try {
+      const { toNodeHandler } = await import('better-auth/node');
+      const auth = await getAuth();
+      return toNodeHandler(auth)(req, res);
+    } catch (err) {
+      next(err);
+    }
+  });
+
   // ---- Raw body capture for Stripe webhook. ----
   // We need access to req.rawBody for signature verification. Instead of
   // configuring express.json with verify, we let the webhook route use its
@@ -47,9 +73,6 @@ const createApp = () => {
   // JSON for everything else.
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-  // ---- Cookies. ----
-  app.use(cookieParser());
 
   // ---- Prevent NoSQL injection ($, . in keys). ----
   app.use(mongoSanitize());

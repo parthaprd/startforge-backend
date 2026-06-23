@@ -53,3 +53,6 @@ coverage/
 .tmp/
 test-results/
 junit.xml
+
+# Windows reserved-name artifact (created accidentally by `> nul` redirects)
+nul

@@ -1,11 +1,13 @@
 /**
- * Auth routes.
+ * Custom auth/profile routes (mounted at /api/auth BEFORE the Better Auth
+ * catch-all in src/app.js, so these specific paths take precedence and every
+ * other /api/auth/* request falls through to Better Auth).
  *
- *   POST   /register
- *   POST   /login
- *   POST   /logout
- *   GET    /me              (protected)
- *   PUT    /update-profile  (protected)
+ *   GET  /api/auth/me              (protected)
+ *   PUT  /api/auth/update-profile  (protected)
+ *
+ * register / login / logout are provided by Better Auth
+ * (/api/auth/sign-up/email, /api/auth/sign-in/email, /api/auth/sign-out).
  */
 const express = require('express');
 const router = express.Router();
@@ -13,18 +15,15 @@ const router = express.Router();
 const authController = require('../controllers/auth.controller');
 const { protect } = require('../middlewares/auth.middleware');
 const { validateRequest } = require('../middlewares/validation.middleware');
-const {
-  registerRules,
-  loginRules,
-  updateProfileRules,
-} = require('../validators/auth.validator');
+const { updateProfileRules } = require('../validators/auth.validator');
 
-router.post('/register', registerRules, validateRequest, authController.register);
-router.post('/login', loginRules, validateRequest, authController.login);
-router.post('/logout', authController.logout);
 router.get('/me', protect, authController.me);
+
 router.put(
   '/update-profile',
+  // Local JSON parser: the global express.json() is registered after this
+  // router (it must run after the Better Auth handler).
+  express.json({ limit: '1mb' }),
   protect,
   updateProfileRules,
   validateRequest,

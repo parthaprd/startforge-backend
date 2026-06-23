@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 
-const authRoutes = require('./auth.routes');
 const startupRoutes = require('./startup.routes');
 const opportunityRoutes = require('./opportunity.routes');
 const applicationRoutes = require('./application.routes');
@@ -25,7 +24,8 @@ router.get('/', (_req, res) => {
   res.status(200).send('api is working');
 });
 
-router.use('/auth', authRoutes);
+// NOTE: /auth is handled in src/app.js (Better Auth handler + custom profile
+// routes) which must be wired before the global JSON body parser.
 router.use('/startups', startupRoutes);
 router.use('/opportunities', opportunityRoutes);
 router.use('/applications', applicationRoutes);

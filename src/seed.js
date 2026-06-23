@@ -17,6 +17,7 @@ const Opportunity = require('./models/Opportunity.model');
 const Application = require('./models/Application.model');
 const Payment = require('./models/Payment.model');
 const connectDB = require('./config/database');
+const { getAuth } = require('./config/auth');
 const logger = require('./utils/logger');
 
 // Dummy data inputs
@@ -151,13 +152,22 @@ const seedDatabase = async () => {
     await connectDB();
     logger.info('Resetting database...');
 
-    // 2. Clear existing collections
+    // 2. Clear existing collections (including Better Auth collections)
     await User.deleteMany({});
     await Startup.deleteMany({});
     await Opportunity.deleteMany({});
     await Application.deleteMany({});
     await Payment.deleteMany({});
+    const rawDb = mongoose.connection.db;
+    await Promise.all(
+      ['account', 'session', 'verification'].map((c) =>
+        rawDb.collection(c).deleteMany({}).catch(() => {})
+      )
+    );
     logger.info('Database collections cleared successfully.');
+
+    // Better Auth instance used to create credentialed users.
+    const auth = await getAuth();
 
     // 3. Create Users
     const usersToInsert = [];
@@ -201,11 +211,31 @@ const seedDatabase = async () => {
       });
     }
 
-    // We save each user one by one to trigger the password hashing pre-save middleware
+    // Create each user through Better Auth so credentials land in the
+    // `account` collection, then apply non-input fields (premium, etc.).
     const savedUsers = [];
     for (const u of usersToInsert) {
-      const user = new User(u);
-      const savedUser = await user.save();
+      await auth.api.signUpEmail({
+        body: {
+          name: u.name,
+          email: u.email,
+          password: u.password,
+          role: u.role,
+          bio: u.bio || '',
+          skills: u.skills || [],
+          portfolio: u.portfolio || '',
+        },
+      });
+
+      const extra = { role: u.role };
+      if (u.isPremium) extra.isPremium = true;
+      if (u.premiumExpiresAt) extra.premiumExpiresAt = u.premiumExpiresAt;
+
+      const savedUser = await User.findOneAndUpdate(
+        { email: u.email.toLowerCase() },
+        extra,
+        { new: true }
+      );
       savedUsers.push(savedUser);
     }
     logger.info(`Inserted ${savedUsers.length} users (50 founders, 50 collaborators, 2 admins).`);

@@ -1,37 +1,39 @@
+/**
+ * Authentication middleware backed by Better Auth.
+ *
+ * `protect` reads the Better Auth session from the request (cookie or bearer
+ * header) and then loads the matching Mongoose `User` document by email, so
+ * downstream controllers keep receiving a full Mongoose user (with _id, role,
+ * isPremium, virtuals, etc.) – exactly like before.
+ */
 const User = require('../models/User.model');
 const ApiError = require('../utils/ApiError');
-const { verifyToken, signToken } = require('../utils/jwt');
 const logger = require('../utils/logger');
+const { getAuth } = require('../config/auth');
 
-const COOKIE_NAME = 'token';
-
-const extractToken = (req) => {
-  if (req.cookies && req.cookies[COOKIE_NAME]) {
-    return req.cookies[COOKIE_NAME];
-  }
-  const header = req.headers.authorization || req.headers.Authorization;
-  if (header && /^bearer\s+/i.test(header)) {
-    return header.replace(/^bearer\s+/i, '').trim();
-  }
-  return null;
+const resolveSession = async (req) => {
+  const { fromNodeHeaders } = await import('better-auth/node');
+  const auth = await getAuth();
+  return auth.api.getSession({ headers: fromNodeHeaders(req.headers) });
 };
 
 const protect = async (req, _res, next) => {
   try {
-    const token = extractToken(req);
-    const decoded = verifyToken(token);
+    const session = await resolveSession(req);
+    if (!session || !session.user) {
+      throw new ApiError(401, 'Authentication required. Please log in.');
+    }
 
-    const user = await User.findById(decoded.id);
+    const user = await User.findOne({ email: session.user.email });
     if (!user) {
       throw new ApiError(401, 'The user belonging to this session no longer exists.');
     }
-
     if (user.isBlocked) {
       throw new ApiError(403, 'Your account has been blocked. Please contact support.');
     }
 
     req.user = user;
-    req.token = token;
+    req.authSession = session.session;
     next();
   } catch (err) {
     next(err);
@@ -40,50 +42,20 @@ const protect = async (req, _res, next) => {
 
 const optionalAuth = async (req, _res, next) => {
   try {
-    const token = extractToken(req);
-    if (token) {
-      const decoded = verifyToken(token);
-      const user = await User.findById(decoded.id);
+    const session = await resolveSession(req);
+    if (session && session.user) {
+      const user = await User.findOne({ email: session.user.email });
       if (user && !user.isBlocked) {
         req.user = user;
       }
     }
   } catch (err) {
-    logger.debug(`optionalAuth ignored invalid token: ${err.message}`);
+    logger.debug(`optionalAuth ignored invalid session: ${err.message}`);
   }
   next();
-};
-
-const setAuthCookie = (res, token) => {
-  const days = parseInt(process.env.JWT_COOKIE_EXPIRE || '7', 10);
-  const maxAge = days * 24 * 60 * 60 * 1000;
-
-  const isProd = process.env.NODE_ENV === 'production';
-
-  res.cookie(COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: isProd,
-    sameSite: isProd ? 'none' : 'lax',
-    maxAge,
-    path: '/',
-  });
-};
-
-const clearAuthCookie = (res) => {
-  res.clearCookie(COOKIE_NAME, { path: '/' });
-};
-
-const issueAuth = (res, user) => {
-  const token = signToken({ id: user._id.toString(), email: user.email, role: user.role });
-  setAuthCookie(res, token);
-  return token;
 };
 
 module.exports = {
   protect,
   optionalAuth,
-  setAuthCookie,
-  clearAuthCookie,
-  issueAuth,
-  COOKIE_NAME,
 };

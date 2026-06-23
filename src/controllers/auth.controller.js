@@ -2,30 +2,14 @@ const asyncHandler = require('../utils/asyncHandler');
 const ApiResponse = require('../utils/ApiResponse');
 const ApiError = require('../utils/ApiError');
 const authService = require('../services/auth.service');
-const { issueAuth, clearAuthCookie } = require('../middlewares/auth.middleware');
 
-const register = asyncHandler(async (req, res) => {
-  const user = await authService.registerUser(req.body);
-  const token = issueAuth(res, user);
-  return ApiResponse.created(res, 'Account created successfully.', {
-    user: authService.toPublicUser(user),
-    token,
-  });
-});
-
-const login = asyncHandler(async (req, res) => {
-  const user = await authService.loginUser(req.body);
-  const token = issueAuth(res, user);
-  return ApiResponse.ok(res, 'Logged in successfully.', {
-    user: authService.toPublicUser(user),
-    token,
-  });
-});
-
-const logout = asyncHandler(async (_req, res) => {
-  clearAuthCookie(res);
-  return ApiResponse.ok(res, 'Logged out successfully.');
-});
+/**
+ * Note: register / login / logout are served by Better Auth:
+ *   POST /api/auth/sign-up/email
+ *   POST /api/auth/sign-in/email
+ *   POST /api/auth/sign-out
+ *   GET  /api/auth/get-session   (and social: /api/auth/sign-in/social)
+ */
 
 const me = asyncHandler(async (req, res) => {
   if (!req.user) throw ApiError.unauthorized('Not authenticated.');
@@ -42,9 +26,6 @@ const updateProfile = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
-  register,
-  login,
-  logout,
   me,
   updateProfile,
 };
