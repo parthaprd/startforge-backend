@@ -15,8 +15,8 @@ const connectDB = require('./config/database');
 const { getAuth } = require('./config/auth');
 const logger = require('./utils/logger');
 
-const ADMIN_NAME = process.env.ADMIN_NAME || 'Super Admin';
-const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'admin@startupforge.com').toLowerCase();
+const ADMIN_NAME = process.env.ADMIN_NAME || 'Admin';
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'admin12@startupforge.com').toLowerCase();
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Admin123!';
 
 const createAdmin = async () => {

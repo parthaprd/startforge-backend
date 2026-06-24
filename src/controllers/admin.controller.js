@@ -12,7 +12,7 @@ const listUsers = asyncHandler(async (req, res) => {
 });
 
 const blockUser = asyncHandler(async (req, res) => {
-  const user = await adminService.blockUser(req.params.id);
+  const user = await adminService.blockUser(req.params.id, req.user);
   return ApiResponse.ok(res, 'User blocked successfully.', { id: user._id, isBlocked: true });
 });
 

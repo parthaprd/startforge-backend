@@ -1,13 +1,4 @@
-/**
- * Database Seeder Script
- *
- * This script clears the database and inserts 50 dummy records for:
- * - Users (50 founders, 50 collaborators, 2 admins)
- * - Startups (50 startups, one for each founder)
- * - Opportunities (50 opportunities across the startups)
- * - Applications (50 unique applicant-opportunity applications)
- * - Payments (50 mock Stripe checkout records)
- */
+
 
 require('dotenv').config();
 const mongoose = require('mongoose');

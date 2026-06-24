@@ -32,9 +32,21 @@ const listUsers = async (query = {}) => {
   return { docs, pagination: buildPagination(count, page, limit) };
 };
 
-const blockUser = async (id) => {
-  const user = await User.findByIdAndUpdate(id, { isBlocked: true }, { new: true });
+const blockUser = async (id, actingUser) => {
+  const user = await User.findById(id);
   if (!user) throw ApiError.notFound('User not found.');
+
+  // Admins can never be blocked – this is what caused the original lockout.
+  if (user.role === 'admin') {
+    throw ApiError.badRequest('Admin users cannot be blocked.');
+  }
+  // Safety net: never let an admin block their own account.
+  if (actingUser && String(user._id) === String(actingUser._id)) {
+    throw ApiError.badRequest('You cannot block your own account.');
+  }
+
+  user.isBlocked = true;
+  await user.save();
   return user;
 };
 
