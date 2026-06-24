@@ -82,4 +82,27 @@ router.get('/auth-config', async (req, res, next) => {
   }
 });
 
+// GET /api/test/session-debug
+router.get('/session-debug', async (req, res, next) => {
+  try {
+    const { getAuth } = require('../config/auth');
+    const { fromNodeHeaders } = await import('better-auth/node');
+    const auth = await getAuth();
+    const session = await auth.api.getSession({ 
+      headers: fromNodeHeaders(req.headers) 
+    });
+
+    res.status(200).json({
+      success: true,
+      hasSession: !!session,
+      session: session,
+      cookies: req.headers.cookie || 'No cookies received',
+      origin: req.headers.origin || 'No origin header',
+      referer: req.headers.referer || 'No referer',
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 module.exports = router;
