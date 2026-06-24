@@ -60,4 +60,26 @@ router.get('/data', async (req, res, next) => {
   }
 });
 
+// GET /api/test/auth-config
+router.get('/auth-config', async (req, res, next) => {
+  try {
+    const config = {
+      hasGoogleClientId: !!process.env.GOOGLE_CLIENT_ID,
+      hasGoogleClientSecret: !!process.env.GOOGLE_CLIENT_SECRET,
+      hasBetterAuthSecret: !!process.env.BETTER_AUTH_SECRET,
+      betterAuthUrl: process.env.BETTER_AUTH_URL || 'NOT SET',
+      trustedOrigins: process.env.TRUSTED_ORIGINS || process.env.CLIENT_URL || 'NOT SET',
+      nodeEnv: process.env.NODE_ENV,
+      mongoConnected: require('mongoose').connection.readyState === 1,
+    };
+
+    res.status(200).json({
+      success: true,
+      config
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 module.exports = router;
