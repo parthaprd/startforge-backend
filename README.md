@@ -379,6 +379,25 @@ Authorization: Bearer <token>
 - Configure the **Stripe webhook** in the Stripe dashboard to point at your deployed `/api/payments/webhook`.
 - CORS origins must include your deployed frontend domain.
 
+### Google OAuth on Vercel (fix)
+
+Google sign-in (`/api/auth/sign-in/social/google`) requires these env vars to be set correctly in the **Vercel dashboard** (not `.env`, which is only used locally):
+
+| Variable | Production value |
+|----------|-----------------|
+| `BETTER_AUTH_URL` | `https://<your-vercel-domain>` e.g. `https://startforge-backend.vercel.app` |
+| `NODE_ENV` | `production` |
+| `TRUSTED_ORIGINS` | `https://<your-frontend-domain>` |
+| `CLIENT_URL` | `https://<your-frontend-domain>` |
+
+You must also add the callback URI in **Google Cloud Console → APIs & Services → Credentials → Authorized redirect URIs**:
+
+```
+https://startforge-backend.vercel.app/api/auth/callback/google
+```
+
+Without `BETTER_AUTH_URL` pointing to the production domain, Better Auth constructs the OAuth redirect URI as `http://localhost:5000/...`, which Google rejects.
+
 ---
 
 ## Architectural Decisions
