@@ -112,6 +112,7 @@ const buildAuth = async () => {
       defaultCookieAttributes: {
         sameSite: isProd ? 'none' : 'lax',
         secure: isProd,
+        path: '/',
       },
     },
   });
