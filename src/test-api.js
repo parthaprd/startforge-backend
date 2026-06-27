@@ -465,9 +465,15 @@ const runTests = async (baseUrl = 'http://localhost:5000') => {
     {
       name: 'Logout All Users',
       fn: async () => {
-        const res1 = await client.post('/api/auth/sign-out', {}, authHeaders(founderCookie));
-        const res2 = await client.post('/api/auth/sign-out', {}, authHeaders(collabCookie));
-        const res3 = await client.post('/api/auth/sign-out', {}, authHeaders(adminCookie));
+        // Better Auth sign-out requires an Origin header (CSRF protection).
+        const origin = baseUrl;
+        const withOrigin = (cookie) => ({
+          headers: { Cookie: cookie, Origin: origin },
+        });
+
+        const res1 = await client.post('/api/auth/sign-out', {}, withOrigin(founderCookie));
+        const res2 = await client.post('/api/auth/sign-out', {}, withOrigin(collabCookie));
+        const res3 = await client.post('/api/auth/sign-out', {}, withOrigin(adminCookie));
 
         if (res1.status === 200 && res2.status === 200 && res3.status === 200) {
           log('All users logged out successfully.', 'success');
