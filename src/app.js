@@ -56,6 +56,7 @@ const createApp = () => {
   // ============================================================
   app.use('/api/auth', authRoutes);
 
+  // Better Auth catch-all: handles sign-up, sign-in, sign-out, social OAuth, etc.
   app.all('/api/auth/*', async (req, res, next) => {
     try {
       const { toNodeHandler } = await import('better-auth/node');
