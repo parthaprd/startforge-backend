@@ -14,7 +14,25 @@ const { getAuth } = require('../config/auth');
 const resolveSession = async (req) => {
   const { fromNodeHeaders } = await import('better-auth/node');
   const auth = await getAuth();
-  return auth.api.getSession({ headers: fromNodeHeaders(req.headers) });
+
+  // Primary: use the standard cookie/header flow
+  let session = await auth.api.getSession({ headers: fromNodeHeaders(req.headers) });
+
+  // Fallback: if no session found via cookie, try the x-session-token header.
+  // This handles cross-origin deployments where browsers block Set-Cookie on
+  // different domains (e.g. frontend on Vercel A, backend on Vercel B).
+  if (!session && req.headers['x-session-token']) {
+    const token = req.headers['x-session-token'];
+    const syntheticHeaders = new Headers({
+      ...Object.fromEntries(
+        Object.entries(req.headers).filter(([k]) => k !== 'x-session-token')
+      ),
+      Cookie: `better-auth.session_token=${token}`,
+    });
+    session = await auth.api.getSession({ headers: syntheticHeaders });
+  }
+
+  return session;
 };
 
 const protect = async (req, _res, next) => {

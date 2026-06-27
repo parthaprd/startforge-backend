@@ -19,6 +19,28 @@ const { updateProfileRules } = require('../validators/auth.validator');
 
 router.get('/me', protect, authController.me);
 
+// Returns the full signed session token so the frontend can store it for
+// cross-origin requests (browsers block reading Set-Cookie headers in JS).
+// Call this immediately after sign-in/email while the browser cookie is set.
+router.get('/session-token', async (req, res) => {
+  try {
+    const { fromNodeHeaders } = await import('better-auth/node');
+    const { getAuth } = require('../config/auth');
+    const auth = await getAuth();
+    const session = await auth.api.getSession({ headers: fromNodeHeaders(req.headers) });
+    if (!session) {
+      return res.status(401).json({ success: false, message: 'No active session.' });
+    }
+    // The raw signed token is the cookie value — extract it from the request
+    const rawCookie = req.headers.cookie || '';
+    const match = rawCookie.match(/better-auth\.session_token=([^;]+)/);
+    const signedToken = match ? decodeURIComponent(match[1]) : null;
+    return res.json({ success: true, token: signedToken, sessionToken: session.session?.token });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 router.put(
   '/update-profile',
   // Local JSON parser: the global express.json() is registered after this

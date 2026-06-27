@@ -45,6 +45,20 @@ const createApp = () => {
   // ---- Cookies (needed before auth so sessions resolve). ----
   app.use(cookieParser());
 
+  // ---- Cross-origin session token support. ----
+  // Browsers block Set-Cookie across different domains (frontend on Vercel A,
+  // backend on Vercel B). The frontend sends the session token via the custom
+  // x-session-token header instead. We inject it as the Cookie header here
+  // so Better Auth and all downstream middleware see it normally.
+  app.use((req, _res, next) => {
+    const token = req.headers['x-session-token'];
+    if (token && !req.headers['cookie']?.includes('better-auth.session_token')) {
+      const existing = req.headers['cookie'] ? req.headers['cookie'] + '; ' : '';
+      req.headers['cookie'] = `${existing}better-auth.session_token=${token}`;
+    }
+    next();
+  });
+
   // ============================================================
   // Better Auth
   // ------------------------------------------------------------
