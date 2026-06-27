@@ -1,13 +1,13 @@
 /**
  * Custom auth/profile routes (mounted at /api/auth BEFORE the Better Auth
  * catch-all in src/app.js, so these specific paths take precedence and every
- * other /api/auth/* request falls through to Better Auth).
+ * other /api/auth/* request falls through to Better Auth.
  *
- *   GET  /api/auth/me              (protected)
- *   PUT  /api/auth/update-profile  (protected)
- *
- * register / login / logout are provided by Better Auth
- * (/api/auth/sign-up/email, /api/auth/sign-in/email, /api/auth/sign-out).
+ *   POST /api/auth/sign-in/email   — wraps Better Auth, injects signedToken
+ *   POST /api/auth/sign-up/email   — wraps Better Auth, injects signedToken
+ *   GET  /api/auth/session-token   — returns signed token from active session
+ *   GET  /api/auth/me              — (protected)
+ *   PUT  /api/auth/update-profile  — (protected)
  */
 const express = require('express');
 const router = express.Router();
@@ -16,6 +16,69 @@ const authController = require('../controllers/auth.controller');
 const { protect } = require('../middlewares/auth.middleware');
 const { validateRequest } = require('../middlewares/validation.middleware');
 const { updateProfileRules } = require('../validators/auth.validator');
+const { getAuth } = require('../config/auth');
+
+// ── Sign-in: call Better Auth's API directly, inject signedToken ─────────────
+router.post('/sign-in/email', express.json({ limit: '1mb' }), async (req, res) => {
+  try {
+    const auth = await getAuth();
+    const { fromNodeHeaders } = await import('better-auth/node');
+
+    const result = await auth.api.signInEmail({
+      body: req.body,
+      headers: fromNodeHeaders(req.headers),
+      asResponse: true,
+    });
+
+    // Forward all headers (cookies, etc.) from Better Auth's response
+    result.headers.forEach((value, name) => {
+      res.setHeader(name, value);
+    });
+
+    const body = await result.json();
+
+    // Extract the full signed token from the Set-Cookie header
+    const setCookieVal = result.headers.get('set-cookie') || '';
+    const match = setCookieVal.match(/better-auth\.session_token=([^;]+)/);
+    if (match) {
+      body.signedToken = decodeURIComponent(match[1]);
+    }
+
+    return res.status(result.status).json(body);
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ── Sign-up: same pattern ─────────────────────────────────────────────────────
+router.post('/sign-up/email', express.json({ limit: '1mb' }), async (req, res) => {
+  try {
+    const auth = await getAuth();
+    const { fromNodeHeaders } = await import('better-auth/node');
+
+    const result = await auth.api.signUpEmail({
+      body: req.body,
+      headers: fromNodeHeaders(req.headers),
+      asResponse: true,
+    });
+
+    result.headers.forEach((value, name) => {
+      res.setHeader(name, value);
+    });
+
+    const body = await result.json();
+
+    const setCookieVal = result.headers.get('set-cookie') || '';
+    const match = setCookieVal.match(/better-auth\.session_token=([^;]+)/);
+    if (match) {
+      body.signedToken = decodeURIComponent(match[1]);
+    }
+
+    return res.status(result.status).json(body);
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
 
 router.get('/me', protect, authController.me);
 
