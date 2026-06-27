@@ -31,7 +31,10 @@ const userSchema = new mongoose.Schema(
       match: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Please provide a valid email'],
       index: true,
     },
-    // Set by Better Auth on email verification flows.
+    password: {
+      type: String,
+      select: false, // never returned in queries unless explicitly .select('+password')
+    },
     emailVerified: {
       type: Boolean,
       default: false,
