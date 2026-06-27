@@ -63,7 +63,11 @@ const buildAuth = async () => {
     );
   }
 
-  const isProd = process.env.NODE_ENV === 'production';
+  // In production (or when explicitly deployed), cookies must be SameSite=None; Secure
+  // so they survive cross-site redirects (Google → backend callback).
+  // Vercel always sets NODE_ENV=production, but we also check VERCEL env var as a
+  // belt-and-suspenders fallback.
+  const isProd = process.env.NODE_ENV === 'production' || !!process.env.VERCEL;
 
   const auth = betterAuth({
     baseURL,
