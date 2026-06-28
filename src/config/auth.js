@@ -9,7 +9,13 @@ const jwt = require('jsonwebtoken');
 
 const getSecret = () => {
   const s = process.env.JWT_SECRET || process.env.BETTER_AUTH_SECRET;
-  if (!s) throw new Error('JWT_SECRET is not set in environment variables.');
+  if (!s) {
+    // This will be caught by the global error handler and logged server-side.
+    // Check that JWT_SECRET is set in your deployment environment variables.
+    const err = new Error('Server misconfiguration: JWT_SECRET is not set.');
+    err.statusCode = 500;
+    throw err;
+  }
   return s;
 };
 
