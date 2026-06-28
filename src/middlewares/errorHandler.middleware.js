@@ -38,7 +38,9 @@ const normalizeError = (err) => {
 
   return new ApiError(
     err.statusCode || 500,
-    isDev ? err.message : 'Internal server error. Please try again later.'
+    // In production, expose message for operational errors, hide for unknown ones.
+    // Always expose if statusCode was explicitly set (e.g. missing config).
+    (isDev || err.statusCode) ? err.message : 'Internal server error. Please try again later.'
   );
 };
 
