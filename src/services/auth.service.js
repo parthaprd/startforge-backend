@@ -3,6 +3,7 @@
  * Uses bcryptjs for password hashing and JWT for tokens.
  */
 const bcrypt = require('bcryptjs');
+const mongoose = require('mongoose');
 const User = require('../models/User.model');
 const ApiError = require('../utils/ApiError');
 const { signToken } = require('../config/auth');
@@ -16,6 +17,30 @@ const toPublicUser = (user) => {
   delete obj.password;
   delete obj.__v;
   return obj;
+};
+
+/**
+ * Resolve the bcrypt hash for a given user.
+ * Priority:
+ *   1. user.password  (set by our own register endpoint)
+ *   2. Better Auth `account` collection (set by seed / Better Auth signUpEmail)
+ */
+const resolvePasswordHash = async (user) => {
+  // Already loaded via .select('+password')
+  if (user.password) return user.password;
+
+  // Fall back to Better Auth's account collection.
+  // Better Auth stores userId as an ObjectId.
+  try {
+    const db = mongoose.connection.db;
+    const account = await db.collection('account').findOne({
+      userId: user._id, // ObjectId — matches how Better Auth stores it
+      providerId: 'credential',
+    });
+    return account?.password || null;
+  } catch {
+    return null;
+  }
 };
 
 const register = async ({ name, email, password, role = 'collaborator', image }) => {
@@ -41,7 +66,11 @@ const login = async ({ email, password }) => {
   if (!user) throw ApiError.unauthorized('Invalid email or password.');
   if (user.isBlocked) throw ApiError.forbidden('Your account has been blocked. Please contact support.');
 
-  const isMatch = await bcrypt.compare(password, user.password);
+  // Get hash from user doc or fall back to Better Auth account collection
+  const hash = await resolvePasswordHash(user);
+  if (!hash) throw ApiError.unauthorized('Invalid email or password.');
+
+  const isMatch = await bcrypt.compare(password, hash);
   if (!isMatch) throw ApiError.unauthorized('Invalid email or password.');
 
   const token = signToken({ id: user._id, email: user.email, role: user.role });
